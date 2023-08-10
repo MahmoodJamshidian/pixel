@@ -57,6 +57,12 @@ class User(custom_model):
     password: str = db.Column(db.String(64), nullable=False)
     __dict_filter__ = lambda _name, _val: False if _name == 'password' else None
 
+    def to_dict(self, full=True, all_projects=False) -> Dict:
+        res = super().to_dict(full)
+        if full and not all_projects:
+            res['projects'] = [project for project in res['projects'] if not project['private']]
+        return res
+
 # projects table
 class Project(custom_model):
     id: int = db.Column(db.Integer, primary_key=True)

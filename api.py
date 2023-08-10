@@ -3,7 +3,6 @@ from flask_restful.reqparse import RequestParser, Namespace
 from flask import Blueprint, request, current_app, url_for
 from typing import List
 from utils import *
-import inspect
 import models
 
 __version__ = '0.1'
@@ -95,6 +94,16 @@ class AccessControl:
         return wrapper
     
     @staticmethod
+    def unforced(func):
+        def wrapper(*args, **kwargs):
+            if 'user' in func_parameters(func) and (access_token:=request.headers.get('Authorization', '').split()) or access_token[0] != 'Bearer':
+                token: models.AccessToken = models.AccessToken.query.filter(models.AccessToken.token==access_token[1]).first()
+                if token:
+                    kwargs['user'] = token.user
+            func(*args, **kwargs)
+        return wrapper    
+    
+    @staticmethod
     def just_self(func):
         def wrapper(*args, **kwaregs):
             if request.remote_addr != '127.0.0.1':
@@ -104,24 +113,24 @@ class AccessControl:
 
 # User Resource class for add, get, update and delete users from database
 class User(Resource):
-    method_decorators = {'post': [AccessControl.just_self], 'put': [AccessControl.just_self, AccessControl.auth], 'delete': [AccessControl.just_self, AccessControl.auth]}
+    method_decorators = {'get': [AccessControl.unforced], 'post': [AccessControl.just_self], 'put': [AccessControl.just_self], 'delete': [AccessControl.just_self]}
     @marshal_with(f_user_full_get)
-    def get(self):
+    def get(self, user: models.User = None):
         # get user by id or username (first priority with id)
         args: Namespace = rp_user_get.parse_args(strict=False)
 
         if (args['id'] is None) and (args['username'] is None):
             abort(400, message="At least one of the 'id' or 'username' arguments is required")
         
-        user: models.User
+        target_user: models.User
 
         if args['id']:
-            user = models.User.query.get(args['id'])
+            target_user = models.User.query.get(args['id'])
         else:
-            user = models.User.query.filter(models.User.username==args['username']).first()
+            target_user = models.User.query.filter(models.User.username==args['username']).first()
 
-        if user:
-            return user.to_dict(True)
+        if target_user:
+            return target_user.to_dict(True, user is not None)
         else:
             abort(400, message="User not found")
     
