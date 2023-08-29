@@ -1,11 +1,12 @@
-from typing import Union, List, Dict, Tuple
+from typing import Union, List, Dict, Tuple, Any
 import inspect
 import hashlib
+import uuid
 
 # validity class for check validity of request arguments
 class Validity:
     @staticmethod
-    def username(_val: Union[list, dict, str]):
+    def username(_val: Any):
         if type(_val) != str:
             raise ValueError("Username must be a string")
         if len(_val) < 5 or len(_val) > 20:
@@ -13,7 +14,7 @@ class Validity:
         return _val
     
     @staticmethod
-    def first_name(_val: Union[list, dict, str]):
+    def first_name(_val: Any):
         if type(_val) != str:
             raise ValueError("First name must be a string")
         if len(_val) > 30:
@@ -21,7 +22,7 @@ class Validity:
         return _val
 
     @staticmethod
-    def last_name(_val: Union[list, dict, str]):
+    def last_name(_val: Any):
         if type(_val) != str:
             raise ValueError("Last name must be a string")
         if len(_val) > 30:
@@ -29,7 +30,7 @@ class Validity:
         return _val
     
     @staticmethod
-    def username_search(_val: Union[list, dict, str]):
+    def username_search(_val: Any):
         if type(_val) != str:
             raise ValueError("Username must be a string")
         if len(_val) > 20:
@@ -37,11 +38,37 @@ class Validity:
         return _val
     
     @staticmethod
-    def password(_val: Union[list, dict, str]):
+    def password(_val: Any):
         if type(_val) != str:
             raise ValueError("Password must be a string")
         if len(_val) < 8:
             raise ValueError("Password cannot be lesser than 8 characters")
+        return _val
+    
+    @staticmethod
+    def project_name(_val: Any):
+        if type(_val) != str:
+            raise ValueError("Project name must be a string")
+        if len(_val) < 5 or len(_val) > 30:
+            raise ValueError("Project name must be a string and between 5 and 30 characters")
+        return _val
+    
+    @staticmethod
+    def boolean(_val: Any):
+        if type(_val) != bool:
+            raise ValueError()
+        return _val
+    
+    @staticmethod
+    def string(_val: Any):
+        if type(_val) != str:
+            raise ValueError()
+        return _val
+    
+    @staticmethod
+    def integer(_val: Any):
+        if type(_val) != int:
+            raise ValueError()
         return _val
 
 # for remove extra key and values from a dictionary
@@ -80,3 +107,5 @@ def sha256_hash(_val: Union[bytes, str]):
     if type(_val) == str:
         _val = _val.encode()
     return hashlib.sha256(_val).hexdigest()
+
+uuid4 = lambda: str(uuid.uuid4())

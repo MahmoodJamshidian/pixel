@@ -26,5 +26,6 @@ def index():
     return render_template("index.html")
 
 # run application if it is main file 
+
 if __name__ == "__main__":
     app.run(debug=True)
