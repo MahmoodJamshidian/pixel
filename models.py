@@ -16,9 +16,6 @@ save = lambda: db.session.commit()
 add = lambda *args, **kwargs: db.session.add(*args, **kwargs)
 remove = lambda obj: db.session.delete(obj)
 
-# statuses that projects can have
-PROJECT_STATUS=('starting', 'development', 'completed')
-
 class Project: ...
 
 # a custom class to simplify the task of converting data to a dictionary
@@ -70,7 +67,6 @@ class User(custom_model):
     def to_dict(self, full=True, all_projects=False) -> Dict:
         res = super().to_dict(full)
         if full and not all_projects:
-            # print(full , not all_projects)
             res['projects'] = [project for project in res['projects'] if not project['private']]
         return res
 
@@ -78,12 +74,11 @@ class User(custom_model):
 class Project(custom_model):
     id: int = db.Column(db.Integer, primary_key=True)
     name: str = db.Column(db.String(30), nullable=False)
-    status: int = db.Column(db.Integer, nullable=False, default=0)
+    is_open: int = db.Column(db.Boolean, nullable=False, default=True)
     created_at: datetime = db.Column(db.DateTime, default=datetime.utcnow)
     last_modify: datetime = db.Column(db.DateTime, nullable=True)
     private: bool = db.Column(db.Boolean, default=False)
     user_id: int = db.Column(db.Integer, db.ForeignKey(User.id))
-    __dict_filter__ = lambda _, _name, _val: PROJECT_STATUS[_val] if _name == 'status' else None
 
 # access token table
 class AccessToken(security_model):

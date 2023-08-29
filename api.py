@@ -51,10 +51,21 @@ rp_project_add = RequestParser(bundle_errors=True)
 rp_project_add.add_argument('name', type=Validity.project_name, help='Project name must be a string and between 5 and 30 characters', required=True, location=['json'])
 rp_project_add.add_argument('private', type=Validity.boolean, help='Boolean value (true/false)', required=False, default=False, location=['json'])
 
+rp_project_update = RequestParser()
+rp_project_update.add_argument('id', type=Validity.integer, help='id is the project\'s numeric identifier', required=True, location=['json'])
+rp_project_update.add_argument('name', type=Validity.project_name, help='Project name must be a string and between 5 and 30 characters', required=False, location=['json'])
+rp_project_update.add_argument('private', type=Validity.boolean, help='Boolean value (true/false)', required=False, location=['json'])
+rp_project_update.add_argument('is_open', type=Validity.boolean, help='Boolean value (true/false). false if you want to close project, true to reopen project', required=False, location=['json'])
+
+rp_project_delete = RequestParser()
+rp_project_delete.add_argument('id', type=Validity.integer, help='id is the project\'s numeric identifier', required=True, location=['json'])
+
 # response fields for formatting response
 f_project_get = {
     'id': fields.Integer,
-    'status': fields.String,
+    'name': fields.String,
+    'is_open': fields.Boolean,
+    'created_at': fields.DateTime,
     'last_modify': fields.DateTime,
     'private': fields.Boolean,
     'user_id': fields.Integer
@@ -103,6 +114,8 @@ f_user_update = f_user_add
 
 f_user_delete = {}
 
+f_project_delete = {}
+
 # api access management class
 class AccessControl:
     @staticmethod
@@ -112,7 +125,6 @@ class AccessControl:
                 abort(401, message="Your authentication failed. Please double check your information and try again.")
 
             token: models.AccessToken = models.AccessToken.query.filter(models.AccessToken.token==access_token[1]).first()
-
             if not token:
                 abort(401, message="Your authentication failed. Please double check your information and try again.")
             if 'user' in func_parameters(func):
@@ -253,7 +265,7 @@ class UserLogin(Resource):
         abort(400, message="Username or Password is incurrect")
 
 class Project(Resource):
-    method_decorators = {'get': [AccessControl.unforced], 'post': [AccessControl.auth]}
+    method_decorators = {'get': [AccessControl.unforced], 'post': [AccessControl.auth], 'put': [AccessControl.auth], 'delete': [AccessControl.auth]}
     @marshal_with(f_project_full_get)
     def get(self, user: models.User = None):
         # get project by id or name (first priority with id)
@@ -280,6 +292,58 @@ class Project(Resource):
             return project.to_dict(True)
         
         abort(400, message="Project already exists")
+    
+    @marshal_with(f_project_full_get)
+    def put(self, user: models.User):
+        # update  project information and change project status (open/closed)
+        args: Namespace = rp_project_update.parse_args()
+
+        if (args['name'] is None) and (args['private'] is None) and (args['is_open'] is None):
+            abort(400, message="At least one of the 'name', 'private' or 'is_open' arguments is required")
+        
+        project: models.Project = models.Project.query.get(args['id'])
+
+        if not project:
+            abort(404, message="Project not found")
+
+        if project.private:
+            if user != project.user:
+                abort(404, message="Project not found")
+        else:
+            if user != project.user:
+                abort(400, message="You don't have permission")
+        
+        if args['name'] is not None:
+            project.name = args['name']
+        if args['private'] is not None:
+            project.private = args['private']
+        if args['is_open'] is not None:
+            project.is_open = args['is_open']
+        
+        models.save()
+
+        return project.to_dict(True)
+    
+    @marshal_with(f_project_delete)
+    def delete(self, user: models.User):
+        # delete project
+        args: Namespace = rp_project_delete.parse_args()
+
+        project: models.Project = models.Project.query.get(args['id'])
+
+        if not project:
+            abort(404, message="Project not found")
+
+        if project.private:
+            if user != project.user:
+                abort(404, message="Project not found")
+        else:
+            if user != project.user:
+                abort(400, message="You don't have permission")
+        
+        models.remove(project)
+        models.save()
+
 
 # add all resources and set endpoint
 api.add_resource(User, "/user", endpoint='user')
