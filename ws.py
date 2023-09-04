@@ -8,7 +8,7 @@ WS_MAX_MSG_SIZE = parse_int(os.environ['WS_MAX_MSG_SIZE'])
 
 __version__ = '0.1'
 
-app = Blueprint('websocket', __name__)
+app = Blueprint('ws', __name__)
 sock = Sock()
 
 @sock.route("/editor", app)
