@@ -109,3 +109,10 @@ def sha256_hash(_val: Union[bytes, str]):
     return hashlib.sha256(_val).hexdigest()
 
 uuid4 = lambda: str(uuid.uuid4())
+
+# try parse to integer
+def parse_int(_val: str):
+    try:
+        return int(_val)
+    except:
+        return None
