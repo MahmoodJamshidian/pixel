@@ -6,9 +6,11 @@ from typing import List
 from utils import *
 import datetime
 import models
+import ws
 import os
 
 USER_LOGON_EXPIRE_HOURS = int(os.environ['USER_LOGON_EXPIRE_HOURS'])
+WS_STREAM_EXPIRE_HOURS = int(os.environ['WS_STREAM_EXPIRE_HOURS'])
 
 __version__ = '0.1'
 
@@ -59,6 +61,15 @@ rp_project_update.add_argument('is_open', type=Validity.boolean, help='Boolean v
 
 rp_project_delete = RequestParser()
 rp_project_delete.add_argument('id', type=Validity.integer, help='id is the project\'s numeric identifier', required=True, location=['json'])
+
+rp_stream_get = RequestParser()
+rp_stream_get.add_argument('id', type=int, help='id is the stream\'s numeric identifier', required=True, location=['args'])
+
+rp_stream_add = RequestParser()
+rp_stream_add.add_argument('project_id', type=Validity.integer, help='project_id is the project\'s numeric identifier', required=True, location=['json'])
+
+rp_stream_delete = RequestParser()
+rp_stream_delete.add_argument('id', type=Validity.integer, help='id is the stream\'s numeric identifier', required=True, location=['json'])
 
 # response fields for formatting response
 f_project_get = {
@@ -115,6 +126,21 @@ f_user_update = f_user_add
 f_user_delete = {}
 
 f_project_delete = {}
+
+f_stream_get = {
+    'id': fields.Integer,
+    'is_open': fields.Boolean,
+    'expires_at': fields.DateTime,
+    'project_id': fields.Integer,
+    'project': fields.Nested(f_project_get)
+}
+
+f_stream_add = {
+    **f_stream_get,
+    'token': fields.String
+}
+
+f_stream_delete = {}
 
 # api access management class
 class AccessControl:
@@ -327,7 +353,7 @@ class Project(Resource):
     @marshal_with(f_project_delete)
     def delete(self, user: models.User):
         # delete project
-        args: Namespace = rp_project_delete.parse_args()
+        args: Namespace = rp_project_delete.parse_args(strict=True)
 
         project: models.Project = models.Project.query.get(args['id'])
 
@@ -344,9 +370,63 @@ class Project(Resource):
         models.remove(project)
         models.save()
 
+class Stream(Resource):
+    method_decorators = {'get': [AccessControl.auth], 'post': [AccessControl.auth], 'delete': [AccessControl.auth]}
+    @marshal_with(f_stream_get)
+    def get(self, user: models.User):
+        args: Namespace = rp_stream_get.parse_args(strict=True)
+
+        stream: models.Stream = models.Stream.query.filter(models.Stream.id==args['id']).first()
+
+        if not stream or stream.project.user_id != user.id:
+            abort(404, message="Stream not found")
+
+        return stream.to_dict(True)
+        
+    @marshal_with(f_stream_add)
+    def post(self, user: models.User):
+        args: Namespace = rp_stream_add.parse_args(strict=True)
+        
+        project: models.Project = models.Project.query.filter(and_(models.Project.user_id==user.id, models.Project.id==args['project_id'])).first()
+
+        if not project:
+            abort(404, message="Project not found")
+        
+        if project.stream:
+            abort(400, message="Project already have stream")
+        
+        stream = models.Stream(project_id=project.id, expires_at=datetime.datetime.utcnow()+datetime.timedelta(hours=WS_STREAM_EXPIRE_HOURS))
+
+        models.add(stream)
+        models.save()
+
+        return {
+            **stream.to_dict(True),
+            'token': stream.token
+        }
+    
+    @marshal_with(f_stream_delete)
+    def delete(self, user:models.User):
+        args: Namespace = rp_stream_delete.parse_args(strict=True)
+
+        stream: models.Stream = models.Stream.query.filter(models.Stream.id==args['id']).first()
+
+        if not stream or stream.project.user_id != user.id:
+            abort(404, message="Stream not found")
+        
+        # close websocket
+        for stream_ind in range(len(ws.streams)):
+            if stream.id == ws.streams[stream_ind].id:
+                ws.ws_stream[stream_ind].close(1000, "Close stream (forced)")
+                ws.streams.pop(stream_ind)
+                ws.ws_stream.pop(stream_ind)
+
+        models.remove(stream)
+        models.save()
 
 # add all resources and set endpoint
 api.add_resource(User, "/user", endpoint='user')
 api.add_resource(UserSearch, "/user/search", endpoint='user_search')
 api.add_resource(UserLogin, "/user/login", endpoint='user_login')
 api.add_resource(Project, "/project", endpoint='project')
+api.add_resource(Stream, "/stream", endpoint='stream')

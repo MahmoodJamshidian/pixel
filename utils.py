@@ -1,6 +1,8 @@
 from typing import Union, List, Dict, Tuple, Any
 import inspect
 import hashlib
+import random
+import string
 import uuid
 
 # validity class for check validity of request arguments
@@ -116,3 +118,54 @@ def parse_int(_val: str):
         return int(_val)
     except:
         return None
+    
+def token_generator(_size: int = 40):
+    _upper_chr_len = random.randint(60, 65)*_size//100 # 60~65% upper-case character
+    _lower_chr_len = _size//5 # 20% lower-case character
+    _sym_chr_len = _size//10 # 10% symbols
+    _num_chr_len = _size-(_upper_chr_len + _lower_chr_len + _sym_chr_len) # 5~10% number
+
+    _upper_chrs = random.choices(string.ascii_uppercase, k=_upper_chr_len)
+    _lower_chrs = random.choices(string.ascii_lowercase, k=_lower_chr_len)
+    _sym_chrs = random.choices("$-_.+!*'()", k=_sym_chr_len)
+    _num_chrs = random.choices(string.digits, k=_num_chr_len)
+
+    _token = [*' '*_size]
+
+    _lower_chrs_pos = []
+    for chr_ind in range(_lower_chr_len):
+        while True:
+            _pos = random.randint(0, _size-1)
+            if not (_pos in _lower_chrs_pos or (_pos+1 < _size and _pos-1 in _lower_chrs_pos) or (_pos-1 >= 0 and _pos-1 in _lower_chrs_pos)):
+                if _token[_pos] == ' ':
+                    break
+        _lower_chrs_pos.append(_pos)
+        _token[_pos] = _lower_chrs[chr_ind]
+    
+    _sym_chrs_pos = []
+    for chr_ind in range(_sym_chr_len):
+        while True:
+            _pos = random.randint(0, _size-1)
+            if not (_pos in _sym_chrs_pos or (_pos+1 < _size and _pos-1 in _sym_chrs_pos) or (_pos-1 >= 0 and _pos-1 in _sym_chrs_pos) and _token[_pos] != ' '):
+                if _token[_pos] == ' ':
+                    break
+        _sym_chrs_pos.append(_pos)
+        _token[_pos] = _sym_chrs[chr_ind]
+    
+    _num_chrs_pos = []
+    for chr_ind in range(_num_chr_len):
+        while True:
+            _pos = random.randint(0, _size-1)
+            if not (_pos in _num_chrs_pos or (_pos+1 < _size and _pos-1 in _num_chrs_pos) or (_pos-1 >= 0 and _pos-1 in _num_chrs_pos) and _token[_pos] != ' '):
+                if _token[_pos] == ' ':
+                    break
+        _num_chrs_pos.append(_pos)
+        _token[_pos] = _num_chrs[chr_ind]
+    
+    _upper_chr_ind = 0
+    for chr_ind in range(_size):
+        if _token[chr_ind] == ' ':
+            _token[chr_ind] = _upper_chrs[_upper_chr_ind]
+            _upper_chr_ind += 1
+    
+    return ''.join(_token)

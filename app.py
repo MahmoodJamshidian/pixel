@@ -23,7 +23,7 @@ ws.__init__(app)
 # load a simple page
 @app.route("/")
 def index():
-    return render_template("index.html")
+    return render_template("test.html")
 
 # run application if it is main file 
 
